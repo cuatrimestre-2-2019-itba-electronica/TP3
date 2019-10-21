@@ -14,7 +14,7 @@
 #define DRIVER_FTM_CLK_SOURCE 1
 #define DRIVER_FTM_CLK_TIMER_AMAUNT 4
 #define DRIVER_FTM_CNTIN_INIT 0x0000
-#define DRIVER_FTM_CNTIN_MOD 0xFFFF
+#define DRIVER_FTM_CNTIN_MOD (10000-1)
 #define DRIVER_FTM_PSC DRIVER_FTM_PSC_x32
 
 typedef uint8_t pin_t;
@@ -86,11 +86,16 @@ void driverFtmInit(int witchFtm){
 	FTM0->MOD = 	(FTM0->MOD 	 & ~FTM_MOD_MOD_MASK)	| FTM_MOD_MOD(DRIVER_FTM_CNTIN_MOD);//seteo el valor al que llega el contador
 	FTM0->CNTIN = 	(FTM0->CNTIN & ~FTM_CNTIN_INIT_MASK)| FTM_CNTIN_INIT(DRIVER_FTM_CNTIN_INIT);//seteo el valor inicial del contador
 
-	driverFtmSetCahnelOutputCompare(0);
-	driverFtmSetChanelValue(100,0,0);
-	//Elijo fuente de clock al final, porque al cambiarlo de 0 se prende
-	FTM0->SC = 		(FTM0->SC 	 & ~FTM_SC_CLKS_MASK) 	| FTM_SC_CLKS(DRIVER_FTM_CLK_SOURCE); //indico que utilizo el sitme clock 50M
+	//driverFtmSetCahnelOutputCompare(0);
+
+	//driverFtmSetCahnelOutputCompare(0);
+	FtmSetChanelPwm(0);
+	driverFtmSetChanelValue(2500-1,0,0);
 	setup_pin(PIN_FTM0C0);
+	//Elijo fuente de clock al final, porque al cambiarlo de 0 se prende
+
+	FTM0->SC = 		(FTM0->SC 	 & ~FTM_SC_CLKS_MASK) 	| FTM_SC_CLKS(DRIVER_FTM_CLK_SOURCE); //indico que utilizo el sitme clock 50M
+
 	NVIC_EnableIRQ(FTM0_IRQn);//habilito la interrupcion de ese periferico
 
 	//	FTM0->MODE = 	(FTM0->MODE	 & ~FTM_MODE_INIT_MASK)	| FTM_MODE_INIT_MASK;
@@ -115,7 +120,7 @@ void FTM0_DriverIRQHandler(void){
 
 	if(chanel0CompFlag){
 		FTM0->CONTROLS[0].CnSC= (FTM0->CONTROLS[0].CnSC & ~FTM_CnSC_CHF_MASK)|FTM_CnSC_CHF(0); //reseteo el flag de la irq
-		driverFtmUpdateChanelCountInK(100);
+		//driverFtmUpdateChanelCountInK(100);
 		gpioToggle(PIN_SCK);
 	}
 
@@ -147,6 +152,33 @@ void driverFtmSetCahnelOutputCompare(uint8_t chanel){
 
 }
 
+void driverFtmSetPwmDutyChanel(uint8_t chanel,uint8_t pwm){
+
+	int v;
+	v=DRIVER_FTM_CNTIN_MOD/255;
+	v=v*pwm;
+
+	driverFtmSetChanelValue(v,0,0);
+
+}
+
+void FtmSetChanelPwm(uint8_t chanel){
+	FTM0->COMBINE=(FTM0->COMBINE & ~FTM_COMBINE_DECAPEN0_MASK)|FTM_COMBINE_DECAPEN0(0);
+	FTM0->COMBINE=(FTM0->COMBINE & ~FTM_COMBINE_COMBINE0_MASK )|FTM_COMBINE_COMBINE0(0);
+
+	FTM0->SC=(FTM0->SC & ~FTM_SC_CPWMS_MASK)|FTM_SC_CPWMS(0);
+
+	FTM0->CONTROLS[chanel].CnSC = (FTM0->CONTROLS[chanel].CnSC & ~ FTM_CnSC_MSB_MASK)| FTM_CnSC_MSB(1);
+	FTM0->CONTROLS[chanel].CnSC = (FTM0->CONTROLS[chanel].CnSC & ~ FTM_CnSC_MSA_MASK)| FTM_CnSC_MSA(1);
+
+	FTM0->CONTROLS[chanel].CnSC = (FTM0->CONTROLS[chanel].CnSC & ~ FTM_CnSC_ELSB_MASK)| FTM_CnSC_ELSB(0);
+	FTM0->CONTROLS[chanel].CnSC = (FTM0->CONTROLS[chanel].CnSC & ~ FTM_CnSC_ELSA_MASK)| FTM_CnSC_ELSA(1);
+	FTM0->PWMLOAD= (FTM0->PWMLOAD & ~FTM_PWMLOAD_LDOK_MASK )|FTM_PWMLOAD_LDOK_MASK ;
+	FTM0->PWMLOAD= (FTM0->PWMLOAD & ~FTM_PWMLOAD_CH0SEL_MASK )|FTM_PWMLOAD_CH0SEL_MASK ;
+	FTM0->CONTROLS[chanel].CnSC = (FTM0->CONTROLS[chanel].CnSC & ~FTM_CnSC_CHIE_MASK )|FTM_CnSC_CHIE(1); //habilitio las interrupciones del canal
+
+}
+
 
 //value el valor que se setea en el contador
 //chanel el canal deseado a setear el value
@@ -165,7 +197,7 @@ static uint16_t driverFtmGetCounterValue(uint8_t ftm){
 }
 
 static void driverFtmUpdateChanelCountInK(uint16_t k){
-	driverFtmSetChanelValue(driverFtmGetChanleValue(0,0)+k,0,0);
+	driverFtmSetChanelValue((driverFtmGetChanleValue(0,0)+k)%DRIVER_FTM_CNTIN_MOD,0,0);
 }
 
 

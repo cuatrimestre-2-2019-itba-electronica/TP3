@@ -35,6 +35,7 @@
 #define DRIVERFTM_H_
 #include <stdint.h>
 void driverFtmInit(int witchFtm);
+void driverFtmSetPwmDutyChanel(uint8_t chanel,uint8_t pwm);
 
 
 #endif /* DRIVERFTM_H_ */
