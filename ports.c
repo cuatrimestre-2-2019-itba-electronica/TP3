@@ -54,14 +54,14 @@ static uint32_t sim_port[] = {SIM_SCGC5_PORTA_MASK, SIM_SCGC5_PORTB_MASK, SIM_SC
  *******************************************************************************
  ******************************************************************************/
 
-void portsSetupPin (pin_t pin)
+void portsSetupPin (pin_t pin, uint8_t mux)
 {
 	int pinPort = PIN2PORT(pin);
 	int pinBit = PIN2NUM(pin);
 	SIM->SCGC5 |= sim_port[pinPort]; //Habilito el clock al puerto correspondiente
 
 	//configuro el pcr del pin
-	ports[pinPort]->PCR[pinBit]= PORT_PCR_MUX(4) | \
+	ports[pinPort]->PCR[pinBit]= PORT_PCR_MUX(mux) | \
 			PORT_PCR_IRQC(0) | \
 			PORT_PCR_PS(0)| \
 			PORT_PCR_PE(0);

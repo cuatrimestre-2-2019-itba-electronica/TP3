@@ -149,6 +149,7 @@ typedef struct {
     FTM_channelData_t * channelConfigsBuff;
     uint8_t channelConfigsBuffLen;
     FTM_callback overflowCallback;
+    bool interruptsEnabled;
     bool restartRegisters;	//Habilitar las funciones de PWMLOAD. Cada canal debe indicar si lo quiere utilizar o no
 } FTM_initData_t;
 
