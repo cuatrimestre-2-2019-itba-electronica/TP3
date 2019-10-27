@@ -47,7 +47,7 @@ typedef void (*pinIrqFun_t)(void);
  * FUNCTION PROTOTYPES WITH GLOBAL SCOPE
  ******************************************************************************/
 
-void portsSetupPin (pin_t pin, uint8_t mux);
+void portsSetupPin(pin_t pin, uint8_t mux);
 
 
 /*******************************************************************************

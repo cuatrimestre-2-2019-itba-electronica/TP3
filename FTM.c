@@ -15,11 +15,14 @@
 #define FTM_MODULES_COUNT  4
 #define FTM_CHANNELS_COUNT 8
 
+//todo: sacar los defines de aca
 #define FTM0_CH0_PIN PORTNUM2PIN(PC, 1) //CH0
 #define FTM0_CH1_PIN PORTNUM2PIN(PC, 2) //CH1
 #define FTM0_CH2_PIN PORTNUM2PIN(PC, 3) //CH2
 #define FTM0_CH3_PIN PORTNUM2PIN(PC, 4) //CH3
-#define FTM0_CH4_PIN PORTNUM2PIN(PA, 0) //CH5
+#define FTM0_CH4_PIN 0xFF //CH4
+#define FTM0_CH5_PIN PORTNUM2PIN(PA, 0) //CH5
+#define FTM0_CH6_PIN 0xFF //CH6
 #define FTM0_CH7_PIN PORTNUM2PIN(PA, 2) //CH7
 //FTM3
 #define FTM3_CH0_PIN PORTNUM2PIN(PD, 0) //CH0
@@ -27,6 +30,9 @@
 #define FTM3_CH2_PIN PORTNUM2PIN(PD, 2) //CH2
 #define FTM3_CH3_PIN PORTNUM2PIN(PD, 3) //CH3
 #define FTM3_CH5_PIN PORTNUM2PIN(PC, 9) //CH5
+
+
+#define FTM0_PIN_MUX 4
 
 /*******************************************************************************
  * ENUMERATIONS AND STRUCTURES AND TYPEDEFS
@@ -42,10 +48,14 @@
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
  ******************************************************************************/
 
-static void FTM_setupChannel(uint8_t FTM_n, FTM_channelData_t * data);
-static int  FTM_getMod(FTM_Type * FTM_base_ptr);
-static int  FTM_getCntinInit(FTM_Type * FTM_base_ptr);
-static int  FTM_getCnV(FTM_Type * FTM_base_ptr, uint8_t channel);
+static void 		FTM_setupChannel(uint8_t FTM_n, FTM_channelData_t * data);
+static int  		FTM_getMod(FTM_Type * FTM_base_ptr);
+static int  		FTM_getCntinInit(FTM_Type * FTM_base_ptr);
+static int32_t 		FTM_getCnV(uint8_t FTM_n, uint8_t channel);
+static void 		FTM_DriverIRQHandler(uint8_t FTM_n);
+static FTM_mode_t 	FTM_getChannelMode(uint8_t FTM_n, uint8_t channel);
+static void 		FTM_DriverIRQHandlerModule(uint8_t FTM_n);
+static void 		FTM_DriverIRQHandlerChannel(uint8_t FTM_n);
 
 
 /*******************************************************************************
@@ -64,16 +74,42 @@ static FTM_callback channelCallbacks[FTM_MODULES_COUNT][FTM_CHANNELS_COUNT];
 // Matriz con los callbacks de todos los modulos. Se llama cuando hay overflow.
 static FTM_callback moduleCallbacks[FTM_MODULES_COUNT];
 
+// Se incrementa cada vez que hay un overflow del contador
+static uint16_t overflowCounter[FTM_MODULES_COUNT];
+
+// Guarda la cuenta de overflows del contador que habia la ultima vez que el
+// input capture se triggereo (para cada canal)
+static uint16_t overflowCounterWhenLastTriggered[FTM_MODULES_COUNT][FTM_CHANNELS_COUNT];
+
+// Guarda el CnV que habia la ultima vez que el input capture se triggereo
+// (para cada canal)
+static uint16_t CnVWhenLastTriggered[FTM_MODULES_COUNT][FTM_CHANNELS_COUNT];
+
+static int32_t overflowCounterDelta[FTM_MODULES_COUNT][FTM_CHANNELS_COUNT];
+
+static int32_t CnVDelta[FTM_MODULES_COUNT][FTM_CHANNELS_COUNT];
 
 static uint32_t combine_syncen_masks[] = {	FTM_COMBINE_SYNCEN0_MASK,
 											FTM_COMBINE_SYNCEN1_MASK,
 											FTM_COMBINE_SYNCEN2_MASK,
 											FTM_COMBINE_SYNCEN3_MASK};
 
-FTM_Type * 		const FTM_bases[] 	= FTM_BASE_PTRS;
-__IO uint32_t * const clock_gates[] = {&(SIM->SCGC6), &(SIM->SCGC6), &(SIM->SCGC6),  &(SIM->SCGC3)};
-const uint32_t  const clock_masks[] = {SIM_SCGC6_FTM0_MASK, SIM_SCGC6_FTM1_MASK, SIM_SCGC6_FTM2_MASK, SIM_SCGC3_FTM3_MASK};
-const uint8_t   const irqEnable[]	= FTM_IRQS;
+static uint32_t FTM0_pins[] = {	FTM0_CH0_PIN,
+								FTM0_CH1_PIN,
+								FTM0_CH2_PIN,
+								FTM0_CH3_PIN,
+								FTM0_CH4_PIN,
+								FTM0_CH5_PIN,
+								FTM0_CH6_PIN,
+								FTM0_CH7_PIN
+							};
+
+static FTM_Type * 		const FTM_bases[] 	= FTM_BASE_PTRS;
+static __IO uint32_t * const clock_gates[] = {&(SIM->SCGC6), &(SIM->SCGC6), &(SIM->SCGC6),  &(SIM->SCGC3)};
+static const uint32_t  const clock_masks[] = {SIM_SCGC6_FTM0_MASK, SIM_SCGC6_FTM1_MASK, SIM_SCGC6_FTM2_MASK, SIM_SCGC3_FTM3_MASK};
+static const uint8_t   const irqEnable[]	= FTM_IRQS;
+
+
 
 /*******************************************************************************
  *******************************************************************************
@@ -87,8 +123,6 @@ void FTM_init(FTM_initData_t * data)
 
 	if(data == 0) { return; }
 
-	portsSetupPin(FTM0_CH0_PIN, 4);
-	//todo: hacer para mas de un canal y mas de un ftm, y poner un define para el mux
 
 	uint8_t FTM_n = data->FTM_n;
 	FTM_Type * FTM_base_ptr = FTM_bases[FTM_n];
@@ -145,6 +179,11 @@ void FTM_setDuty(uint8_t FTM_n, uint8_t channel, uint8_t duty)
 
 }
 
+//uint8_t FTM_getDuty(uint8_t FTM_n, uint8_t channel)
+//{
+//	return 0;
+//}
+
 void FTM_shutdownChannel(uint8_t FTM_n, uint8_t channel)
 {
 
@@ -170,7 +209,8 @@ void FTM2_DriverIRQHandler(void)
 	FTM_DriverIRQHandler(2);
 }
 
-void FTM3_DriverIRQHandler(void){
+void FTM3_DriverIRQHandler(void)
+{
 	FTM_DriverIRQHandler(3);
 }
 
@@ -221,6 +261,9 @@ static void FTM_setupChannel(uint8_t FTM_n, FTM_channelData_t * data)
 			return;
 	}
 
+	//Configuro el pin
+	portsSetupPin(FTM0_pins[channel], FTM0_PIN_MUX); //todo: hacer para mas de un ftm, filosofia de diego: d
+
 	FTM_base_ptr->COMBINE = (FTM_base_ptr->COMBINE	& ~combine_syncen_masks[(int)(channel/2)]) | combine_syncen_masks[(int)(channel/2)];
 
 	switch(data->mode)
@@ -251,6 +294,37 @@ static void FTM_setupChannel(uint8_t FTM_n, FTM_channelData_t * data)
 			}
 			break;
 		case FTM_MODE_INPUT_CAPTURE:
+			////Configuro input capture:
+			// * Decapen = 0
+			// * Combine = 0
+			// * CPWMS = 0
+			// * MSnB = 0
+			// * MSnA = 0
+			FTM_base_ptr->COMBINE 	= (FTM_base_ptr->COMBINE & ~combine_decapen_mask);
+			FTM_base_ptr->COMBINE 	= (FTM_base_ptr->COMBINE & ~combine_combine_mask);
+			FTM_base_ptr->SC		= (FTM_base_ptr->SC 	 & ~FTM_SC_CPWMS_MASK);
+			FTM_base_ptr->CONTROLS[channel].CnSC	= (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_MSA_MASK)| FTM_CnSC_MSA(0);
+			FTM_base_ptr->CONTROLS[channel].CnSC	= (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_MSB_MASK)| FTM_CnSC_MSB(0);
+
+			if(config == FTM_CONFIG_CAPTURE_RISING){
+				////Configuro Capture on Rising Edge Only:
+				// * ELSnB = 0
+				// * ELSnA = 1
+				FTM_base_ptr->CONTROLS[channel].CnSC = (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_ELSA_MASK)	| FTM_CnSC_ELSA(1);
+				FTM_base_ptr->CONTROLS[channel].CnSC = (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_ELSB_MASK)	| FTM_CnSC_ELSB(0);
+			} else if (config == FTM_CONFIG_CAPTURE_FALLING) {
+				////Configuro Capture on Falling Edge Only:
+				// * ELSnB = 1
+				// * ELSnA = 0
+				FTM_base_ptr->CONTROLS[channel].CnSC = (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_ELSA_MASK)	| FTM_CnSC_ELSA(0);
+				FTM_base_ptr->CONTROLS[channel].CnSC = (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_ELSB_MASK)	| FTM_CnSC_ELSB(1);
+			} else if (config == FTM_CONFIG_CAPTURE_BOTH) {
+				////Configuro Capture on Rising or Falling Edge:
+				// * ELSnB = 1
+				// * ELSnA = 1
+				FTM_base_ptr->CONTROLS[channel].CnSC = (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_ELSA_MASK)	| FTM_CnSC_ELSA(1);
+				FTM_base_ptr->CONTROLS[channel].CnSC = (FTM_base_ptr->CONTROLS[channel].CnSC	& ~FTM_CnSC_ELSB_MASK)	| FTM_CnSC_ELSB(1);
+			}
 			break;
 		case FTM_MODE_CPWM:
 			break;
@@ -314,23 +388,40 @@ static int FTM_getCntinInit(FTM_Type * FTM_base_ptr)
 	return (FTM_base_ptr->CNTIN & FTM_CNTIN_INIT_MASK) >> FTM_CNTIN_INIT_SHIFT;
 }
 
-static int FTM_getCnV(FTM_Type * FTM_base_ptr, uint8_t channel)
+static int32_t FTM_getCnV(uint8_t FTM_n, uint8_t channel)
 {
-	return FTM_base_ptr->CONTROLS[channel].CnV;
+	return FTM_bases[FTM_n]->CONTROLS[channel].CnV;
 }
 
-void FTM_DriverIRQHandler(uint8_t FTM_n)
+//todo: poner en alguna unidad razonable como por ejemplo microsegundos
+int32_t FTM_getPeriod(uint8_t FTM_n, uint8_t channel)
 {
-	//Para todas las interrupciones apago el flag y llamo al callback correspondiente.
+	return CnVDelta[FTM_n][channel] + FTM_bases[FTM_n]->MOD * overflowCounterDelta[FTM_n][channel];
+}
 
+static void FTM_DriverIRQHandler(uint8_t FTM_n)
+{
+	FTM_DriverIRQHandlerModule(FTM_n);
+	FTM_DriverIRQHandlerChannel(FTM_n);
+}
+
+static void FTM_DriverIRQHandlerModule(uint8_t FTM_n)
+{
 	//si hubo interrupcion por overflow:
 	if(FTM_bases[FTM_n]->SC & FTM_SC_TOF_MASK){
+		// apago flag de interrupcion
 		FTM_bases[FTM_n]->SC = (FTM_bases[FTM_n]->SC & ~ FTM_SC_TOF_MASK) | FTM_SC_TOF(0);
 		if(moduleCallbacks[FTM_n]){
+			//llamo al callback correspondiente si existe
 			moduleCallbacks[FTM_n]();
+			//incremento el contador de overflows
+			overflowCounter[FTM_n]++;
 		}
 	}
+}
 
+static void FTM_DriverIRQHandlerChannel(uint8_t FTM_n)
+{
 	int channel_count = 2;
 	if(FTM_n == 0 || FTM_n == 3){
 		channel_count = 8;
@@ -339,11 +430,44 @@ void FTM_DriverIRQHandler(uint8_t FTM_n)
 	//si hubo interrupcion en un canal:
 	for(int i = 0; i < channel_count; i++){
 		if(FTM_bases[FTM_n]->CONTROLS[i].CnSC & FTM_CnSC_CHF_MASK){
+			// apago flag de interrupcion
 			FTM_bases[FTM_n]->CONTROLS[i].CnSC = (FTM_bases[FTM_n]->CONTROLS[i].CnSC & ~FTM_CnSC_CHF_MASK) | FTM_CnSC_CHF(0);
+
+			if(FTM_getChannelMode(FTM_n, i) == FTM_MODE_INPUT_CAPTURE){
+				//Guardo datos de CnV
+				int32_t CnV = FTM_getCnV(FTM_n, i);
+				CnVDelta[FTM_n][i] = CnV - (int32_t)CnVWhenLastTriggered[FTM_n][i];
+				CnVWhenLastTriggered[FTM_n][i] = CnV;
+
+				//Guardo datos de overflow
+				if(overflowCounter[FTM_n] > overflowCounterWhenLastTriggered[FTM_n][i]){
+					overflowCounterDelta[FTM_n][i] = overflowCounter[FTM_n]  - overflowCounterWhenLastTriggered[FTM_n][i];
+				} else {
+					overflowCounterDelta[FTM_n][i] = overflowCounterWhenLastTriggered[FTM_n][i] - overflowCounter[FTM_n];
+				}
+				overflowCounterWhenLastTriggered[FTM_n][i] = overflowCounter[FTM_n];
+			}
+
 			if(channelCallbacks[FTM_n][i]){
 				channelCallbacks[FTM_n][i]();
 			}
 		}
+	}
+}
+
+static FTM_mode_t FTM_getChannelMode(uint8_t FTM_n, uint8_t channel)
+{
+	uint32_t CnSC = FTM_bases[FTM_n]->CONTROLS[channel].CnSC;
+	if(FTM_bases[FTM_n]->SC & FTM_SC_CPWMS_MASK){
+		return FTM_MODE_CPWM;
+	} else if(CnSC & FTM_CnSC_MSB_MASK){
+		return FTM_MODE_EPWM;
+	} else if (CnSC & FTM_CnSC_MSA_MASK){
+		return FTM_MODE_OUTPUT_COMPARE;
+	} else if( (CnSC & FTM_CnSC_ELSB_MASK) || (CnSC & FTM_CnSC_ELSA_MASK) ){
+		return FTM_MODE_INPUT_CAPTURE;
+	} else {
+		return FTM_MODE_N;
 	}
 }
 

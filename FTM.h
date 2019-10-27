@@ -180,6 +180,15 @@ void FTM_setDuty(uint8_t FTM_n, uint8_t channel, uint8_t duty);
 /**
  * @brief
  *
+ * @param FTM_n Entre 0 y 3
+ * @param channel Para FTM0 y FTM3: entre 0 y 7. Para FTM1 y FTM2: entre 0 y 1.
+ */
+//todo: uint8_t FTM_getDuty(uint8_t FTM_n, uint8_t channel)
+
+
+/**
+ * @brief
+ *
  * @param FTM_n Entre 0 y 3. Deshabilita el modulo deseleccionando los clocks.
  */
 void FTM_shutdown(uint8_t FTM_n);
@@ -193,6 +202,8 @@ void FTM_shutdown(uint8_t FTM_n);
  */
 void FTM_shutdownChannel(uint8_t FTM_n, uint8_t channel);
 
+//todo: brief de esta funcion
+int32_t FTM_getPeriod(uint8_t FTM_n, uint8_t channel);
 
 
 
