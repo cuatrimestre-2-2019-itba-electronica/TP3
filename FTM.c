@@ -105,9 +105,9 @@ static uint32_t FTM0_pins[] = {	FTM0_CH0_PIN,
 							};
 
 static FTM_Type * 		const FTM_bases[] 	= FTM_BASE_PTRS;
-static __IO uint32_t * const clock_gates[] = {&(SIM->SCGC6), &(SIM->SCGC6), &(SIM->SCGC6),  &(SIM->SCGC3)};
-static const uint32_t  const clock_masks[] = {SIM_SCGC6_FTM0_MASK, SIM_SCGC6_FTM1_MASK, SIM_SCGC6_FTM2_MASK, SIM_SCGC3_FTM3_MASK};
-static const uint8_t   const irqEnable[]	= FTM_IRQS;
+static __IO uint32_t * 	const clock_gates[] = {&(SIM->SCGC6), &(SIM->SCGC6), &(SIM->SCGC6),  &(SIM->SCGC3)};
+static const uint32_t  	const clock_masks[] = {SIM_SCGC6_FTM0_MASK, SIM_SCGC6_FTM1_MASK, SIM_SCGC6_FTM2_MASK, SIM_SCGC3_FTM3_MASK};
+static const uint8_t   	const irqEnable[]	= FTM_IRQS;
 
 
 
@@ -165,7 +165,7 @@ void FTM_init(FTM_initData_t * data)
 
 }
 
-void FTM_setDuty(uint8_t FTM_n, uint8_t channel, uint8_t duty)
+void FTM_setDuty8bits(uint8_t FTM_n, uint8_t channel, uint8_t duty)
 {
 	FTM_Type * FTM_base_ptrs[] = FTM_BASE_PTRS;
 	int mod = FTM_getMod(FTM_base_ptrs[FTM_n]);
@@ -179,19 +179,21 @@ void FTM_setDuty(uint8_t FTM_n, uint8_t channel, uint8_t duty)
 
 }
 
-//uint8_t FTM_getDuty(uint8_t FTM_n, uint8_t channel)
-//{
-//	return 0;
-//}
+void FTM_setDuty12bits(uint8_t FTM_n, uint8_t channel, uint16_t duty)
+{
+	FTM_setDuty8bits(FTM_n, channel, duty>>4);
+}
+
+
 
 void FTM_shutdownChannel(uint8_t FTM_n, uint8_t channel)
 {
-
+	//todo:
 }
 
 void FTM_shutdown(uint8_t FTM_n)
 {
-
+	//todo:
 }
 
 void FTM0_DriverIRQHandler(void)
@@ -356,7 +358,7 @@ static void FTM_setupChannel(uint8_t FTM_n, FTM_channelData_t * data)
 
 
 			//Duty cycle:
-			FTM_setDuty(FTM_n, channel, data->EPWM_data.duty);
+			FTM_setDuty8bits(FTM_n, channel, data->EPWM_data.duty);
 
 			if(config == FTM_CONFIG_HIGH_TRUE){
 				////Configuro High-true:
@@ -393,10 +395,9 @@ static int32_t FTM_getCnV(uint8_t FTM_n, uint8_t channel)
 	return FTM_bases[FTM_n]->CONTROLS[channel].CnV;
 }
 
-//todo: poner en alguna unidad razonable como por ejemplo microsegundos
 int32_t FTM_getPeriod(uint8_t FTM_n, uint8_t channel)
 {
-	return CnVDelta[FTM_n][channel] + FTM_bases[FTM_n]->MOD * overflowCounterDelta[FTM_n][channel];
+	return CnVDelta[FTM_n][channel] + FTM_bases[FTM_n]->MOD * overflowCounterDelta[FTM_n][channel] << 1;
 }
 
 static void FTM_DriverIRQHandler(uint8_t FTM_n)

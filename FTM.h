@@ -129,7 +129,7 @@ typedef union {
     	FTM_mode_t mode;
     	FTM_config_t config;
     	uint8_t channel;    //Para FTM0 y FTM3: entre 0 y 7.
-                        //Para FTM1 y FTM2: entre 0 y 1.
+                        	//Para FTM1 y FTM2: entre 0 y 1.
     	bool interruptsEnabled;
     	FTM_callback callback;
     	pin_t pin;
@@ -169,40 +169,55 @@ typedef struct {
 void FTM_init(FTM_initData_t * data);
 
 /**
- * @brief
+ * @brief Setea el duty de la funcion PWM. Solo tiene efecto en los canales
+ * configurados como EPWM
  *
  * @param FTM_n Entre 0 y 3
- * @param channel Para FTM0 y FTM3: entre 0 y 7. Para FTM1 y FTM2: entre 0 y 1.
- * @param duty 0: duty=0%, 255: duty 100%
+ * @param channel //Para FTM0 y FTM3: entre 0 y 7.
+                  //Para FTM1 y FTM2: entre 0 y 1.
+ * @param duty 0: duty=0%, 0xFF: duty 100%
  */
-void FTM_setDuty(uint8_t FTM_n, uint8_t channel, uint8_t duty);
-
-/**
- * @brief
- *
- * @param FTM_n Entre 0 y 3
- * @param channel Para FTM0 y FTM3: entre 0 y 7. Para FTM1 y FTM2: entre 0 y 1.
- */
-//todo: uint8_t FTM_getDuty(uint8_t FTM_n, uint8_t channel)
+void FTM_setDuty8bits(uint8_t FTM_n, uint8_t channel, uint8_t duty);
 
 
 /**
- * @brief
+ * @brief Setea el duty de la funcion PWM. Solo tiene efecto en los canales
+ * configurados como EPWM
  *
- * @param FTM_n Entre 0 y 3. Deshabilita el modulo deseleccionando los clocks.
+ * @param FTM_n Entre 0 y 3
+ * @param channel //Para FTM0 y FTM3: entre 0 y 7.
+                  //Para FTM1 y FTM2: entre 0 y 1.
+ * @param duty 0: duty=0%, 0x0FF0 a 0x0FFF: duty 100%. Los 4 bits menos
+ * significativos son ignorados.
+ */
+void FTM_setDuty12bits(uint8_t FTM_n, uint8_t channel, uint16_t duty);
+
+/**
+ * @brief Deshabilita el modulo deseleccionando los clocks.
+ *
+ * @param FTM_n Entre 0 y 3.
  */
 void FTM_shutdown(uint8_t FTM_n);
 
 /**
- * @brief
+ * @brief Deshabilita un canal
  *
- * @param FTM_n Entre 0 y 3. Deshabilita el modulo deseleccionando los clocks.
+ * @param FTM_n Entre 0 y 3.
  * @param channel //Para FTM0 y FTM3: entre 0 y 7.
                   //Para FTM1 y FTM2: entre 0 y 1.
  */
 void FTM_shutdownChannel(uint8_t FTM_n, uint8_t channel);
 
-//todo: brief de esta funcion
+/**
+ * @brief Devuelve el ultimo periodo detectado. Solo tiene efecto en los canales
+ * configurados como input capture.
+ *
+ * Devuelve el tiempo en unidades de 10e-8 s
+ *
+ * @param FTM_n Entre 0 y 3.
+ * @param channel //Para FTM0 y FTM3: entre 0 y 7.
+                  //Para FTM1 y FTM2: entre 0 y 1.
+ */
 int32_t FTM_getPeriod(uint8_t FTM_n, uint8_t channel);
 
 

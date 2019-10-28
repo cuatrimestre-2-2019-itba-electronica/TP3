@@ -10,22 +10,22 @@
 #include "SysTick.h"
 
 
+
 static void FSK_generator(void);
 
-static DAC_t dac;
-static DACData_t data[AMOUNT_POINTS];
+static uint16_t data[AMOUNT_POINTS];
 static float data_counter;
-static uint8_t buffer[5]; //buffer circular en el que se guardan los datos a pasar a fsk
-static int circ_counter; //contador para popear al buffer circular
-static int buff_counter; //contador que recorre el buffer para convertir a fsk
-static int size_buff; //tamano del buffer circular
-static int var; 	//variable que se usa para hacer dos pasadas para hacer los dos periodos de la senoidal con mayor frecuencia
+static uint8_t buffer[FSK_BUFFER_LEN] = {0xFF}; 	//buffer circular en el que se guardan los datos a pasar a fsk
+static int circ_counter; 	//contador para popear al buffer circular
+static int buff_counter; 	//contador que recorre el buffer para convertir a fsk
+static int size_buff; 		//tamano del buffer circular
+static int var; 			//variable que se usa para hacer dos pasadas para hacer los dos periodos de la senoidal con mayor frecuencia
 
-void FSK_init(void){
-	DAC_init();
-	dac = DAC0;
-	SysTick_Init();
-	SysTick_append(FSK_generator);
+static FSK_callback cb = 0;
+
+void FSK_init(FSK_callback _cb){
+	cb = _cb;
+	SysTick_append(FSK_generator); //todo: sacar systick y hacer con PIT
 	for (int i = 0; i < AMOUNT_POINTS ; i++)
 		data[i] = (uint16_t) (( 1+ sin((2 * 3.14 * i )/AMOUNT_POINTS)) * 0x7FF);
 	size_buff = sizeof(buffer);
@@ -69,11 +69,10 @@ void FSK_generator(void){
 		else
 			data_counter++;
 	}
-	DAC_set_data(dac, data[(int)data_counter]);
-
+	cb(data[(int)data_counter]);
 }
 
-bool pop_to_buffer (bool num2pop){
+bool FSK_push_to_buffer (bool num2pop){
 	if(num2pop == 0 || num2pop == 1){
 		if(buffer[circ_counter] != 255){
 			return false;
