@@ -149,7 +149,15 @@ void uartInit (uint8_t id, uart_cfg_t config){
 	 /* We need all default settings, so entire register is cleared */
 
 	UART_SetBaudRate(uartch, config.baudrate);
-	uartch->C1 = 0;
+
+	if(config.parity != no_parity){
+		uartch->C1 = UART_C1_PE_MASK | UART_C1_M_MASK;
+		uartch->C4 &= ~UART_C4_M10_MASK;
+		uartch->BDH &= ~UART_BDH_SBNS_MASK;
+
+		if(config.parity == odd_parity) uartch->C1 |= UART_C1_PT_MASK;
+	}
+	else uartch->C1 = 0;
 
 	uartch->C2 = (UART_C2_TE_MASK | UART_C2_RE_MASK | UART_C2_RIE_MASK);
 	NVIC_EnableIRQ(UART_IRQn_list[id]);
@@ -222,7 +230,7 @@ __ISR__ UART0_RX_TX_IRQHandler (void)
 
 	if(tmp & UART_S1_RDRF_MASK){
 		buffer_RX[ptrW_RX] = UART0->D;
-		ptrW_RX++;
+		ptrW_RX++; // Falta el limite del puntero -> 1024
 		N_RX++;
 	}
 

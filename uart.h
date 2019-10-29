@@ -20,17 +20,17 @@
 
 #define UART_CANT_IDS		5 // Numero of UARTs
 
-
 /*******************************************************************************
  * ENUMERATIONS AND STRUCTURES AND TYPEDEFS
  ******************************************************************************/
 
+typedef enum{ no_parity, even_parity, odd_parity} uart_parity;
+
 typedef struct {
-    int parity;
+	uart_parity parity;
     unsigned int baudrate;
     unsigned int stopBit;
 } uart_cfg_t;
-
 
 /*******************************************************************************
  * VARIABLE PROTOTYPES WITH GLOBAL SCOPE
