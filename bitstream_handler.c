@@ -66,7 +66,7 @@ int * get_bitstream(){
 }
 
 void call_back(){
-	buffer[ptr_W] = FREQ; // get freq
+//	buffer[ptr_W] = FREQ; // get freq
 	if (ptr_W++ == 1024) {
 		ptr_W = 0;
 	}
