@@ -15,24 +15,9 @@
 #define FTM_MODULES_COUNT  4
 #define FTM_CHANNELS_COUNT 8
 
-//todo: sacar los defines de aca
-#define FTM0_CH0_PIN PORTNUM2PIN(PC, 1) //CH0
-#define FTM0_CH1_PIN PORTNUM2PIN(PC, 2) //CH1
-#define FTM0_CH2_PIN PORTNUM2PIN(PC, 3) //CH2
-#define FTM0_CH3_PIN PORTNUM2PIN(PC, 4) //CH3
-#define FTM0_CH4_PIN 0xFF //CH4
-#define FTM0_CH5_PIN PORTNUM2PIN(PA, 0) //CH5
-#define FTM0_CH6_PIN 0xFF //CH6
-#define FTM0_CH7_PIN PORTNUM2PIN(PA, 2) //CH7
-//FTM3
-#define FTM3_CH0_PIN PORTNUM2PIN(PD, 0) //CH0
-#define FTM3_CH1_PIN PORTNUM2PIN(PD, 1) //CH1
-#define FTM3_CH2_PIN PORTNUM2PIN(PD, 2) //CH2
-#define FTM3_CH3_PIN PORTNUM2PIN(PD, 3) //CH3
-#define FTM3_CH5_PIN PORTNUM2PIN(PC, 9) //CH5
 
 
-#define FTM0_PIN_MUX 4
+
 
 /*******************************************************************************
  * ENUMERATIONS AND STRUCTURES AND TYPEDEFS
@@ -94,15 +79,6 @@ static uint32_t combine_syncen_masks[] = {	FTM_COMBINE_SYNCEN0_MASK,
 											FTM_COMBINE_SYNCEN2_MASK,
 											FTM_COMBINE_SYNCEN3_MASK};
 
-static uint32_t FTM0_pins[] = {	FTM0_CH0_PIN,
-								FTM0_CH1_PIN,
-								FTM0_CH2_PIN,
-								FTM0_CH3_PIN,
-								FTM0_CH4_PIN,
-								FTM0_CH5_PIN,
-								FTM0_CH6_PIN,
-								FTM0_CH7_PIN
-							};
 
 static FTM_Type * 		const FTM_bases[] 	= FTM_BASE_PTRS;
 static __IO uint32_t * 	const clock_gates[] = {&(SIM->SCGC6), &(SIM->SCGC6), &(SIM->SCGC6),  &(SIM->SCGC3)};
@@ -263,9 +239,6 @@ static void FTM_setupChannel(uint8_t FTM_n, FTM_channelData_t * data)
 			return;
 	}
 
-	//Configuro el pin
-	portsSetupPin(FTM0_pins[channel], FTM0_PIN_MUX); //todo: hacer para mas de un ftm, filosofia de diego: d
-
 	FTM_base_ptr->COMBINE = (FTM_base_ptr->COMBINE	& ~combine_syncen_masks[(int)(channel/2)]) | combine_syncen_masks[(int)(channel/2)];
 
 	switch(data->mode)
@@ -402,8 +375,8 @@ int32_t FTM_getPeriod(uint8_t FTM_n, uint8_t channel)
 
 static void FTM_DriverIRQHandler(uint8_t FTM_n)
 {
-	FTM_DriverIRQHandlerModule(FTM_n);
 	FTM_DriverIRQHandlerChannel(FTM_n);
+	FTM_DriverIRQHandlerModule(FTM_n);
 }
 
 static void FTM_DriverIRQHandlerModule(uint8_t FTM_n)
