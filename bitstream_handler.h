@@ -11,10 +11,10 @@
 #define MARK_PERIOD			1200
 #define SPACE_PERIOD		2400
 
-#define UART_STARTBIT_MASK      1
-#define UART_STOPBIT_MASK       (1 << 10)
-#define UART_DATA_MASK          0XFF
-#define UART_PARITY_MASK        (0x1FF << 1)
+#define UART_STARTBIT_MASK      (1 << 10)
+#define UART_STOPBIT_MASK       1
+#define UART_DATA_MASK          0xFF
+#define UART_PARITY_MASK        0x1FF
 
 /**
  * @brief Convert a char into a UART type bitstream

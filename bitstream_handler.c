@@ -63,21 +63,27 @@ int bitstream_to_char(int *bitstream, char *c)
 }*/
 
 int bitstream_to_char(char *c){
-    if(n_data == 11){
-        n_data = 0;
-        uart_seq_flag = 0;
+	if(n_data == 11){
+		n_data = 0;
+		uart_seq_flag = 0;
 
-        // Check start
+		// Check start
 		if(bitstream_buffer & UART_STARTBIT_MASK) return -1;
 
 		// Check odd parity
-		if((bitstream_buffer & UART_PARITY_MASK) % 2 != 0) return -1;
+		if((bitstream_buffer >> 1 & UART_PARITY_MASK) % 2 != 0) return -1;
 
 		// Check stop
 		if(!(bitstream_buffer & UART_STOPBIT_MASK)) return -1;
+		int data = 0;
+		int temp = (bitstream_buffer >> 2 & UART_DATA_MASK);
+		for(int i=7;i>=0;i--){
+			data |= (temp & 1) << i;
+			temp >>= 1;
+		}
 
-		*c = (char) (bitstream_buffer >> 1 & UART_DATA_MASK);
-    }
+		*c = (char) data;
+	}
 
     return 1;
 }
@@ -116,27 +122,29 @@ int bitstream_to_char_old(char *c){
 }
 
 int get_bitstream(){
-	if(data_flag){
+    if(data_flag){
 
-		data_flag = 0;
+        data_flag = 0;
 
-		int period = getPeriod();
+        int period = get_period();
 
-		if(MARK_PERIOD - period < SPACE_PERIOD - period){
-			bitstream_buffer <<= 1;
-			bitstream_buffer |= 1;
-			if(uart_seq_flag) n_data++;
-		}
-		else if(zero_flag){
-			zero_flag = 0;
-			if(bitstream_buffer & 1 && !uart_seq_flag) uart_seq_flag = 1;
-			bitstream_buffer <<= 1;
-			n_data++;
-		}
-		else zero_flag = 1;
-	}
+        int d_mark = (period - MARK_PERIOD)*(period - MARK_PERIOD);
+        int d_space = (period - SPACE_PERIOD)*(period - SPACE_PERIOD);
+        if(d_mark < d_space){
+            bitstream_buffer <<= 1;
+            bitstream_buffer |= 1;
+            if(uart_seq_flag) n_data++;
+        }
+        else if(zero_flag){
+            zero_flag = 0;
+            if(bitstream_buffer & 1 && !uart_seq_flag) uart_seq_flag = 1;
+            bitstream_buffer <<= 1;
+            n_data++;
+        }
+        else zero_flag = 1;
+    }
 
-	return bitstream_buffer;
+    return bitstream_buffer;
 }
 
 /*
