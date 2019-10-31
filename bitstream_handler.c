@@ -126,22 +126,29 @@ int get_bitstream(){
 
         data_flag = 0;
 
-        int period = get_period();
+        int period = period_test;
+        if(period )
+        //int d_mark = (period - MARK_PERIOD)*(period - MARK_PERIOD);
+        //int d_space = (period - SPACE_PERIOD)*(period - SPACE_PERIOD);
+        if(8000 < period && period < 21500){
+            one_flag++;
+            if(one_flag == 2){
+                one_flag = 0;
+                bitstream_buffer <<= 1;
+                bitstream_buffer |= 1;
+                if(uart_seq_flag) n_data++;
+            }
 
-        int d_mark = (period - MARK_PERIOD)*(period - MARK_PERIOD);
-        int d_space = (period - SPACE_PERIOD)*(period - SPACE_PERIOD);
-        if(d_mark < d_space){
-            bitstream_buffer <<= 1;
-            bitstream_buffer |= 1;
-            if(uart_seq_flag) n_data++;
         }
-        else if(zero_flag){
-            zero_flag = 0;
-            if(bitstream_buffer & 1 && !uart_seq_flag) uart_seq_flag = 1;
-            bitstream_buffer <<= 1;
-            n_data++;
+        else if(21500< period && period < 37000){
+            zero_flag++;
+            if(zero_flag == 4){
+                zero_flag = 0;
+                if(bitstream_buffer & 1 && !uart_seq_flag) uart_seq_flag = 1;
+                bitstream_buffer <<= 1;
+                n_data++;
+            }
         }
-        else zero_flag = 1;
     }
 
     return bitstream_buffer;
