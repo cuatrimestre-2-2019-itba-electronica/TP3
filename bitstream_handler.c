@@ -1,20 +1,28 @@
 #include "bitstream_handler.h"
 
-// Variables for circular buffer
-static char buffer[1024];
-static int ptr_R = 0;
-static int ptr_W = 0;
-static int N_buf = 0;
+static int data_flag = 0;
+
+static int bitstream_buffer = 0;
+static int n_data = 0;
+static int zero_flag = 0;
+static int uart_seq_flag = 0;
 
 void char_to_bitstream(char c, int *bitstream)
 {
+	//uint32_t stream = 0x00;
+	//stream |= c << 1;
+
 	// Start
 	bitstream[0] = 0;
 	int parity_count = 0;
 
 	// Data
-    for (int i = 7; i >= 0; --i)
+    for (int i = 7; i >=0; --i)
     {
+    	//bitstream[i+1] = c & 1;
+    	//parity_count += c & 1;
+    	//c=c>>1;
+
     	if(c & (1 << i)){
     		bitstream[i+1] = 1;
     		parity_count++;
@@ -23,11 +31,12 @@ void char_to_bitstream(char c, int *bitstream)
     }
     // Parity
     bitstream[9] = (parity_count % 2 == 0) ? 1 : 0;
-
+    //bitstream[9] = parity_count & 1;
     // Stop
     bitstream[10] = 1;
 }
 
+/*
 int bitstream_to_char(int *bitstream, char *c)
 {
 	int binary_dato = 0;
@@ -51,27 +60,93 @@ int bitstream_to_char(int *bitstream, char *c)
 	*c = (char) binary_dato;
 
 	return 1;
+}*/
+
+int bitstream_to_char(char *c){
+    if(n_data == 11){
+        n_data = 0;
+        uart_seq_flag = 0;
+
+        // Check start
+		if(bitstream_buffer & UART_STARTBIT_MASK) return -1;
+
+		// Check odd parity
+		if((bitstream_buffer & UART_PARITY_MASK) % 2 != 0) return -1;
+
+		// Check stop
+		if(!(bitstream_buffer & UART_STOPBIT_MASK)) return -1;
+
+		*c = (char) (bitstream_buffer >> 1 & UART_DATA_MASK);
+    }
+
+    return 1;
 }
 
-int * get_bitstream(){
+int bitstream_to_char_old(char *c){
+	if(n_data == 11){
+	        n_data = 0;
+	        uart_seq_flag = 0;
+
+	        // Check stop
+	        int temp = bitstream_buffer & 1;
+	        bitstream_buffer >>= 1;
+	        if(!temp) return -1;
+
+	        // Parity check
+	        temp = bitstream_buffer & 0x1FF;
+	        bitstream_buffer >>= 1;
+	        if(temp % 2 != 0)return -1;
+
+	        int data = 0;
+	        for(int i=7;i>=0;i--){
+	            data |= (bitstream_buffer & 1) << i;
+	            bitstream_buffer >>= 1;
+	        }
+
+	        // Start check
+	        temp = bitstream_buffer & 1;
+	        bitstream_buffer >>= 1;
+	        if(temp) return -1;
+
+	        *c = (char) data;
+	        return 1;
+	    }
+
+	return 0;
+}
+
+int get_bitstream(){
 	if(data_flag){
-		int bitstream[11];
-
-		if(MARK_FREQ - buffer[ptr_R] < SPACE_FREQ - buffer[ptr_R]){
-
-		}
 
 		data_flag = 0;
+
+		int period = getPeriod();
+
+		if(MARK_PERIOD - period < SPACE_PERIOD - period){
+			bitstream_buffer <<= 1;
+			bitstream_buffer |= 1;
+			if(uart_seq_flag) n_data++;
+		}
+		else if(zero_flag){
+			zero_flag = 0;
+			if(bitstream_buffer & 1 && !uart_seq_flag) uart_seq_flag = 1;
+			bitstream_buffer <<= 1;
+			n_data++;
+		}
+		else zero_flag = 1;
 	}
+
+	return bitstream_buffer;
 }
 
+/*
 void call_back(){
-//	buffer[ptr_W] = FREQ; // get freq
+	buffer[ptr_W] = FREQ; // get freq
 	if (ptr_W++ == 1024) {
 		ptr_W = 0;
 	}
 	N_buf++;
-}
+}*/
 
 void set_data_flag(){
 	data_flag = 1;

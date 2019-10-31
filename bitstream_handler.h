@@ -8,10 +8,13 @@
 #ifndef BITSTREAM_HANDLER_H_
 #define BITSTREAM_HANDLER_H_
 
-#define MARK_FREQ		1.2
-#define SPACE_FREQ		2.2
+#define MARK_PERIOD			1200
+#define SPACE_PERIOD		2400
 
-static int data_flag = 0;
+#define UART_STARTBIT_MASK      1
+#define UART_STOPBIT_MASK       (1 << 10)
+#define UART_DATA_MASK          0XFF
+#define UART_PARITY_MASK        (0x1FF << 1)
 
 /**
  * @brief Convert a char into a UART type bitstream
@@ -26,7 +29,7 @@ void char_to_bitstream(char c, int *bitstream);
  * @param c Destination character
  * @return -1 if the bitstream is incorrect 1 otherwise
 */
-int bitstream_to_char(int *bitstream, char *c);
+int bitstream_to_char(char *c);
 
 void set_data_flag();
 
